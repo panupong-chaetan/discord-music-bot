@@ -1,72 +1,45 @@
-const Discord = require("discord.js")
-const dotenv = require("dotenv")
-const { REST } = require("@discordjs/rest")
-const { Routes } = require("discord-api-types/v9")
-const fs = require("fs")
-const { Player } = require("discord-player")
+import fetch from 'node-fetch';
+import { Client, GatewayIntentBits } from 'discord.js';
+import dotenv from 'dotenv';
 
-dotenv.config()
-const TOKEN = process.env.DISCORD_BOT_TOKEN
+dotenv.config();
 
-const LOAD_SLASH = process.argv[2] == "load"
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
+const GAS_WEBAPP_URL = process.env.GAS_WEBAPP_URL;
 
-const CLIENT_ID = "1034445333335384065"
-const GUILD_ID = "994593465050595378"
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages, 
+    GatewayIntentBits.MessageContent
+  ]
+});
 
-const client = new Discord.Client({
-    intents: [
-        "GUILDS",
-        "GUILD_VOICE_STATES"
-    ]
-})
+client.once('ready', () => {
+  console.log(`✅ Logged in as ${client.user.tag}!`);
+});
 
-client.slashcommands = new Discord.Collection()
-client.player = new Player(client, {
-    ytdlOptions: {
-        quality: "highestaudio",
-        highWaterMark: 1 << 25
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  if (message.content.includes('เวลาบอส')) {
+    try {
+      await message.channel.send('กำลังดึงเวลาบอสทั้งหมด... โปรดรอสักครู่');
+
+      const response = await fetch(GAS_WEBAPP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: message.content }),
+      });
+
+      const text = await response.text();
+      await message.channel.send(text);
+
+    } catch (error) {
+      console.error('❌ Error sending to GAS:', error);
+      await message.channel.send('เกิดข้อผิดพลาดในการดึงข้อมูลบอส');
     }
-})
+  }
+});
 
-let commands = []
-
-const slashFiles = fs.readdirSync("./slash").filter(file => file.endsWith(".js"))
-for (const file of slashFiles){
-    const slashcmd = require(`./slash/${file}`)
-    client.slashcommands.set(slashcmd.data.name, slashcmd)
-    if (LOAD_SLASH) commands.push(slashcmd.data.toJSON())
-}
-
-if (LOAD_SLASH) {
-    const rest = new REST({ version: "9" }).setToken(TOKEN)
-    console.log("Deploying slash commands")
-    rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), {body: commands})
-    .then(() => {
-        console.log("Successfully loaded")
-        process.exit(0)
-    })
-    .catch((err) => {
-        if (err){
-            console.log(err)
-            process.exit(1)
-        }
-    })
-}
-else {
-    client.on("ready", () => {
-        console.log(`Logged in as ${client.user.tag}`)
-    })
-    client.on("interactionCreate", (interaction) => {
-        async function handleCommand() {
-            if (!interaction.isCommand()) return
-
-            const slashcmd = client.slashcommands.get(interaction.commandName)
-            if (!slashcmd) interaction.reply("Not a valid slash command")
-
-            await interaction.deferReply()
-            await slashcmd.run({ client, interaction })
-        }
-        handleCommand()
-    })
-    client.login(TOKEN)
-}
+client.login(DISCORD_BOT_TOKEN);
