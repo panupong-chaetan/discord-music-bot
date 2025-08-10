@@ -22,7 +22,7 @@ client.once('ready', () => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  if (message.content.includes('เวลาบอส')) {
+  if (message.content.includes('เวลาบอส!')) {
     try {
       await message.channel.send('กำลังดึงเวลาบอสทั้งหมด... โปรดรอสักครู่');
 
